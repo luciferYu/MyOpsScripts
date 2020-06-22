@@ -1,0 +1,147 @@
+安装 composer
+curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+# 命令补全
+yum install -y bash-completion 
+curl -L https://raw.githubusercontent.com/docker/compose/1.24.1/contrib/completion/bash/docker-compose -o /etc/bash_completion.d/docker-compose
+docker-compose --version
+
+tar zxvf harbor-offline-installer-v1.10.2.tgz
+
+[root@idc-1 harbor]# cat harbor.yml |grep -v ^#|grep -v ^$|grep -v \#
+hostname: harbor.00joy.com
+http:
+  port: 9090 
+harbor_admin_password: Harbor12345
+database:
+  password: root123
+  max_idle_conns: 50
+  max_open_conns: 100
+data_volume: /data/harbor
+clair:
+  updaters_interval: 12
+jobservice:
+  max_job_workers: 10
+notification:
+  webhook_job_max_retry: 10
+chart:
+  absolute_url: disabled
+log:
+  level: info
+  local:
+    rotate_count: 50
+    rotate_size: 200M
+    location: /var/log/harbor
+_version: 1.10.0
+proxy:
+  http_proxy:
+  https_proxy:
+  no_proxy:
+  components:
+    - core
+    - jobservice
+    - clair
+
+[root@idc-1 harbor]# pwd
+/data/software/harbor
+[root@idc-1 harbor]# ./prepare 
+prepare base dir is set to /data/software/harbor
+Unable to find image 'goharbor/prepare:v1.10.2' locally
+Trying to pull repository docker.io/goharbor/prepare ... 
+v1.10.2: Pulling from docker.io/goharbor/prepare
+ae8395e171fb: Pull complete 
+ca35e8aaa3ab: Pull complete 
+40fe63fa9717: Pull complete 
+b716a0e0062b: Pull complete 
+611e775dac46: Pull complete 
+456ee3045669: Pull complete 
+3dfaed1ae811: Pull complete 
+Digest: sha256:0d8607cae14e27acef653814bdc37464890f3c4e0054792774fbf4d90b8080e5
+Status: Downloaded newer image for docker.io/goharbor/prepare:v1.10.2
+WARNING:root:WARNING: HTTP protocol is insecure. Harbor will deprecate http protocol in the future. Please make sure to upgrade to https
+Generated configuration file: /config/log/logrotate.conf
+Generated configuration file: /config/log/rsyslog_docker.conf
+Generated configuration file: /config/nginx/nginx.conf
+Generated configuration file: /config/core/env
+Generated configuration file: /config/core/app.conf
+Generated configuration file: /config/registry/config.yml
+Generated configuration file: /config/registryctl/env
+Generated configuration file: /config/db/env
+Generated configuration file: /config/jobservice/env
+Generated configuration file: /config/jobservice/config.yml
+Generated and saved secret to file: /secret/keys/secretkey
+Generated certificate, key file: /secret/core/private_key.pem, cert file: /secret/registry/root.crt
+Generated configuration file: /compose_location/docker-compose.yml
+Clean up the input dir
+
+[root@idc-1 harbor]# ls /data/harbor
+ca_download  database  job_logs  psc  redis  registry  secret
+
+
+[root@idc-3 harbor]# ./install.sh
+[Step 5]: starting Harbor ...
+Creating network "harbor_harbor" with the default driver
+Creating harbor-log ... done
+Creating redis         ... done
+Creating registryctl   ... done
+Creating harbor-db     ... done
+Creating harbor-portal ... done
+Creating registry      ... done
+Creating harbor-core   ... done
+Creating nginx             ... done
+Creating harbor-jobservice ... done
+? ----Harbor has been installed and started successfully.----
+[root@idc-3 harbor]# docker ps
+CONTAINER ID        IMAGE                                 COMMAND                  CREATED             STATUS                    PORTS                       NAMES
+df1b46bb8081        goharbor/harbor-jobservice:v1.10.2    "/harbor/harbor_jobs…"   56 seconds ago      Up 55 seconds (healthy)                               harbor-jobservice
+195151a89951        goharbor/nginx-photon:v1.10.2         "nginx -g 'daemon of…"   56 seconds ago      Up 55 seconds (healthy)   0.0.0.0:9090->8080/tcp      nginx
+94e738ed6ae2        goharbor/harbor-core:v1.10.2          "/harbor/harbor_core"    56 seconds ago      Up 55 seconds (healthy)                               harbor-core
+59c1a72953c5        goharbor/harbor-registryctl:v1.10.2   "/home/harbor/start.…"   57 seconds ago      Up 56 seconds (healthy)                               registryctl
+27c19190042f        goharbor/harbor-db:v1.10.2            "/docker-entrypoint.…"   57 seconds ago      Up 56 seconds (healthy)   5432/tcp                    harbor-db
+b847586af768        goharbor/registry-photon:v1.10.2      "/home/harbor/entryp…"   57 seconds ago      Up 56 seconds (healthy)   5000/tcp                    registry
+64a9263401ad        goharbor/harbor-portal:v1.10.2        "nginx -g 'daemon of…"   57 seconds ago      Up 56 seconds (healthy)   8080/tcp                    harbor-portal
+f16fc2e2e182        goharbor/redis-photon:v1.10.2         "redis-server /etc/r…"   57 seconds ago      Up 56 seconds (healthy)   6379/tcp                    redis
+ec0926d23dd1        goharbor/harbor-log:v1.10.2           "/bin/sh -c /usr/loc…"   58 seconds ago      Up 56 seconds (healthy)   127.0.0.1:1514->10514/tcp   harbor-log
+
+
+推送出错
+docker-compose down
+修改
+./common/config/core/env:EXT_ENDPOINT=http://harbor.00joy.com:9090
+为
+./common/config/core/env:EXT_ENDPOINT=https://harbor.00joy.com
+
+修改
+./common/config/registry/config.yml:    realm: http://harbor.00joy.com:9090/service/token
+为
+realm: https://harbor.00joy.com/service/token
+
+
+
+# 修改配置后重启
+docker-compose down
+docker-compose up -d
+
+登录
+docker login harbor.00joy.com
+
+
+镜像推送
+docker tag centos:latest harbor.00joy.com/sdk/centos:latest
+docker push harbor.00joy.com/sdk/centos:latest
+
+
+镜像推送出现问题
+[root@idc-3 harbor]# docker push harbor.00joy.com/sdk/hw:latest
+The push refers to repository [harbor.00joy.com/sdk/hw]
+9c27e219663c: Pushing [==================================================>]  15.36kB
+unknown blob
+
+
+解决 nginx 反向代理要去掉HOST 头
+  #proxy_set_header  Host         $host;
+
+
+
+

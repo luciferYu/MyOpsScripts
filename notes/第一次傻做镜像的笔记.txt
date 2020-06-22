@@ -1,0 +1,593 @@
+##  安装
+# 移除旧版本
+sudo yum remove docker \
+                  docker-client \
+                  docker-client-latest \
+                  docker-common \
+                  docker-latest \
+                  docker-latest-logrotate \
+                  docker-logrotate \
+                  docker-selinux \
+                  docker-engine-selinux \
+                  docker-engine
+
+sudo yum install -y yum-utils \
+  device-mapper-persistent-data \
+  lvm2
+
+sudo yum-config-manager \
+    --add-repo \
+    https://download.docker.com/linux/centos/docker-ce.repo
+
+sudo yum install docker-ce  # 安装最新版本
+sudo yum install docker-ce-<VERSION STRING>  # 安装指定版本
+sudo systemctl start docker   #启动服务
+
+
+## 更换国内镜像源 详见
+https://docs.docker.com/config/daemon/#troubleshoot-conflicts-between-the-daemonjson-and-startup-scripts
+方法1
+	docker pull registry.docker-cn.com/library/ubuntu:16.04
+方法2
+	您可以在 Docker 守护进程启动时传入 --registry-mirror 参数：
+	$ docker --registry-mirror=https://registry.docker-cn.com daemon
+方法3
+	为了永久性保留更改，您可以修改 /etc/docker/daemon.json 文件并添加上 registry-mirrors 键值
+	{
+  	"registry-mirrors": ["https://5a5582l7.mirror.aliyuncs.com","http://hub-mirror.c.163.com"]
+	}
+
+	systemctl daemon-reload
+	systemctl restart docker
+
+	 docker info|grep -A 3 Registry
+
+
+
+## docker镜像网址
+https://hub.docker.com/r/library/
+
+
+## 容器使用
+cd /data/web/WochuServerCenter/;/usr/local/python-3.6/bin/uwsgi --ini uwsgi.ini
+
+docker commit -m="WochuServerCenter" -a="yuzhiyi" fc88008c76b1 yuzhiyi/wsc:v1
+
+docker run -d -p 81:8000 yuzhiyi/wsc:v2  /usr/bin/cd /data/web/WochuServerCenter/; /usr/local/python-3.6/bin/uwsgi --ini uwsgi.ini
+
+docker run -d -p 81:8000 yuzhiyi/wsc:v7   /usr/local/python-3.6/bin/uwsgi --ini /data/web/WochuServerCenter/dockeruwsgi.ini
+
+docker run -it yuzhiyi/wsc:v3 /bin/bash
+
+1：docker attach id  刚方法进入之后，exit退出就会导致容器stop
+
+2：docker exec -it containerID /bin/bash   这个命令exit退出，ok容器还在运行
+
+
+## 镜像
+# 从dockerfile里 建立镜像
+docker build -t friendlyhello .
+
+#删除镜像
+docker rmi 327fb3ab8b87
+
+#删除所有名为 none 的镜像
+docker images|grep none|awk '{print $3 }'|xargs docker rmi
+
+#删除所有停止运行的容器
+docker container prune
+
+# 主机间共享镜像
+docker save -o /tmp/wsc.dimg yuzhiyi/wsc:v7
+docker load --input /tmp/wsc.dimg
+
+##  上传镜像
+docker login
+docker tag image username/repository:tag
+For example:
+docker tag friendlyhello gordon/get-started:part2
+docker push username/repository:tag
+
+
+## 启动命令
+docker run -d -p 8022:22 base
+
+docker run -d --restart=always 镜像  #启动容器，如果遇到问题就重启
+docker run -d --restart=on-failure:3 #启动容器，如果遇到错误 尝试重启3次
+docker pause 容器  #暂停容器
+docker unpause 容器 # 取消暂停
+docker run -m 200M --memory-swap=300M ubuntu # 启动容器并限制内存 最多200M内容和 100Mswap
+docker run  -c 1024 ubuntu # 调节CPU权重
+docker run -it --blkio-weight 600 ubuntu  #调节iops权重
+docker run -it --device-write-bps /dev/sda:30MB ubuntu  # 限制设备写某设备速率
+--device-read-bps :限制读某设备的bps
+--device-write-bps: 限制写某个设备的bps
+--device-read-iops 限制读某设备的 iops
+--device-write-iops 限制写某设备的iops
+
+ps axf #查看容器进程
+
+
+##网络
+docker run -it --network=none ubuntu  # 使用none网络
+docker run -it --network=host ubuntu  #使用host网络
+
+ yum install bridge-utils
+[root@node2 docker]# brctl show  # 查看网桥
+bridge name	bridge id		STP enabled	interfaces
+docker0		8000.0242c838dcae	no		veth0a6820c
+							veth1228f2b
+							veth6ccf3be
+							veth6fbecac
+docker_gwbridge		8000.02428a33a5d4	no		veth1d34b9c
+							veth2ab934e
+							veth2db89b4
+							veth6bbc0a8
+							veth935da12
+							vetheb83dd0
+
+[root@node2 docker]# docker network inspect bridge  #检查网桥
+[
+    {
+        "Name": "bridge",
+        "Id": "5b1359d7821c3e21602dfb1b7ea5258df1d5052ce0bae569767aad45d7ad5ccb",
+        "Created": "2018-09-28T16:53:52.175584563+08:00",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": [
+                {
+                    "Subnet": "172.17.0.0/16",
+                    "Gateway": "172.17.0.1"
+                }
+            ]
+        },
+
+[root@node2 docker]# docker network create --driver bridge my_net1  #创建网桥 
+c1aa53c713102b02822e4eada11b8a3fc9e17b7bbba5d742164e8418f6834b5f
+
+[root@node2 docker]# docker network create --driver bridge --subnet 172.22.16.0/24 --gateway 172.22.16.1 my_net2 #创建自定义网段网桥
+bfc2364ed8c262044180ce5093af98e49015933d1fd14276377285ffa3bb0f79
+
+docker run -it --network=my_net2 ubuntu  --ip 172.22.16.8 # 指定网络连接到 my_net2 并指定ip为 172.22.16.8
+
+# 为容器添加一块mynet2的网卡
+docker network connect my_net2 7f026645adf4
+[root@node2 docker]# docker exec -it 7f026645adf4 /bin/bash
+368: eth3@if369: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1500 qdisc noqueue state UP 
+    link/ether 02:42:ac:16:10:02 brd ff:ff:ff:ff:ff:ff
+    inet 172.22.16.2/24 brd 172.22.16.255 scope global eth3
+       valid_lft forever preferred_lft forever
+
+  
+##docker volume 
+[root@node2 docker]# docker volume ls  # 查看docker下得所有卷
+DRIVER              VOLUME NAME
+local               11085103b34ea452d44d2a52019039df319d63ca4302cde2d0a09fc6e8179cde
+
+[root@node2 docker]# docker volume inspect 11085103b34ea452d44d2a52019039df319d63ca4302cde2d0a09fc6e8179cde  查看指定的卷
+[
+    {
+        "CreatedAt": "2018-10-16T15:34:32+08:00",
+        "Driver": "local",
+        "Labels": null,
+        "Mountpoint": "/var/lib/docker/volumes/11085103b34ea452d44d2a52019039df319d63ca4302cde2d0a09fc6e8179cde/_data",
+        "Name": "11085103b34ea452d44d2a52019039df319d63ca4302cde2d0a09fc6e8179cde",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+
+[root@node2 docker]# docker inspect elk|grep -A 10 Mounts # 查看容器名为ELK 所使用的卷
+        "Mounts": [
+            {
+                "Type": "volume",
+                "Name": "5e4ce7af42782855a4c8d95295fbc885a5b4d3f5db0c73641fdc6829226007ec",
+                "Source": "/var/lib/docker/volumes/5e4ce7af42782855a4c8d95295fbc885a5b4d3f5db0c73641fdc6829226007ec/_data",
+                "Destination": "/var/lib/elasticsearch",
+                "Driver": "local",
+                "Mode": "",
+                "RW": true,
+                "Propagation": ""
+            }
+
+[root@node2 ~]# docker cp logstash-tutorial.log elk:/root  # 讲host当前目录下得 logstash-tutorial.log 复制到名为 elk的容器的root目录下
+
+
+
+##  启动services
+docker swarm init     #初始化  
+
+#启动命令
+[root@localhost wsc]# docker service ls      # 查看服务
+ID                  NAME                    MODE                REPLICAS            IMAGE                 PORTS
+jcefjqdid04w        wochuservercenter_web   replicated          3/3                 lucifery/wsc:latest   *:8000->80/tcp
+
+[root@localhost wsc]# docker service ps wochuservercenter_web    #查看服务详细信息
+ID                  NAME                      IMAGE                 NODE                    DESIRED STATE       CURRENT STATE           ERROR               PORTS
+vcm9891tbhor        wochuservercenter_web.1   lucifery/wsc:latest   localhost.localdomain   Running             Running 2 minutes ago                       
+maklggozrz7x        wochuservercenter_web.2   lucifery/wsc:latest   localhost.localdomain   Running             Running 2 minutes ago                       
+yzdthi5my3ns        wochuservercenter_web.3   lucifery/wsc:latest   localhost.localdomain   Running             Running 2 minutes ago        
+               
+[root@localhost wsc]# docker container ls -q    #查看容器sha1
+5705f2fb1156
+badec83d6713
+7193b7b90aca
+
+[root@localhost wsc]# docker ps    # 验证容器sha1 与serviceid不同
+CONTAINER ID        IMAGE                 COMMAND                  CREATED             STATUS              PORTS               NAMES
+5705f2fb1156        lucifery/wsc:latest   "/usr/local/python-3…"   3 minutes ago       Up 3 minutes                            wochuservercenter_web.2.maklggozrz7xkqm2uacsb2wxr
+badec83d6713        lucifery/wsc:latest   "/usr/local/python-3…"   3 minutes ago       Up 3 minutes                            wochuservercenter_web.1.vcm9891tbhornzebwpzabgxd0
+7193b7b90aca        lucifery/wsc:latest   "/usr/local/python-3…"   3 minutes ago       Up 3 minutes                            wochuservercenter_web.3.yzdthi5my3nsasg4sfce2v685
+
+[root@localhost wsc]# docker stack ls  #查看stack
+NAME                SERVICES            ORCHESTRATOR
+wochuservercenter   1                   Swarm
+
+#扩展app的容器数量 修改docker-compose.yml文件的  replicas: 5 数量 重新启动命令运行 
+docker stack deploy -c docker-compose.yml wochuservercenter     #扩展app命令 与启动命令相同
+Updating service wochuservercenter_web (id: wozz9ilckg1o96jyvl5j2oojy)
+image lucifery/wsc:latest could not be accessed on a registry to record
+its digest. Each node will access lucifery/wsc:latest independently,
+possibly leading to different nodes running different
+versions of the image.
+
+[root@localhost web]# docker stack rm wochuservercenter     #停止服务
+Removing service wochuservercenter_web
+Removing network wochuservercenter_webnet
+
+docker swarm leave --force    #停止swarm
+
+
+## 启动swarm
+[root@localhost wsc]# docker swarm init --listen-addr 192.168.14.35:2377  --advertise-addr 192.168.14.35   # 启动swarm 集群
+Swarm initialized: current node (8k0s3wlqux5assh69opkr3bd1) is now a manager.
+
+To add a worker to this swarm, run the following command:
+
+    docker swarm join --token SWMTKN-1-60bnt6hv8lgwgaonel6qa4rn8ewt2u5v99h7sw89s2oa7tfm69-6dwndnolcarwkf31sq6rdr9nk 192.168.14.35:2377
+
+To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
+
+[root@localhost wsc]# docker swarm join-token manager     # 显示已manager加入集群的token
+To add a manager to this swarm, run the following command:
+
+    docker swarm join --token SWMTKN-1-4ck8lws73d5kn8qfku7zor3a7q8stmtjgrpw74te3er1ytbqbp-4jt8cjwfn1bgd0e57b00fqqj8 192.168.14.35:2377
+
+[root@localhost ~]# docker swarm join --token SWMTKN-1-60bnt6hv8lgwgaonel6qa4rn8ewt2u5v99h7sw89s2oa7tfm69-35uu695fxifz5wyo1b6lnxpex 192.168.14.35:2377  # 加入swarm
+
+This node joined a swarm as a manager.
+
+[root@node1 zhiyi_dockerfiles]# docker node ls  # 查看docker swarm 节点
+ID                            HOSTNAME            STATUS              AVAILABILITY        MANAGER STATUS      ENGINE VERSION
+uflctkqmrylmpksa14rkzixr7 *   node1               Ready               Active              Leader              18.06.1-ce
+04jracrl5za6szxqldd3pazfs     node2               Ready               Active                                  18.06.1-ce
+
+
+
+[root@localhost wsc]# docker stack deploy -c docker-compose.yml wochuservercenter  #此时在集群的manager 启动服务
+Creating network wochuservercenter_webnet
+Creating service wochuservercenter_web
+
+[root@localhost wsc]# docker service ps wochuservercenter_web  # 此时服务已启动 但是发现另一个节点没有镜像，是因为我把该镜像设为私有了
+ID                  NAME                          IMAGE                 NODE                    DESIRED STATE       CURRENT STATE                 ERROR                              PORTS
+pk7wce0nik01        wochuservercenter_web.1       lucifery/wsc:latest   localhost.localdomain   Running             Running about a minute ago                                       
+z30lx63jx0u2        wochuservercenter_web.2       lucifery/wsc:latest   localhost.localdomain   Running             Running 51 seconds ago                                           
+lvic42botjh6         \_ wochuservercenter_web.2   lucifery/wsc:latest   localhost.localdomain   Shutdown            Rejected 57 seconds ago       "No such image: lucifery/wsc:l…"   
+chxa22ig7d87         \_ wochuservercenter_web.2   lucifery/wsc:latest   localhost.localdomain   Shutdown            Rejected about a minute ago   "No such image: lucifery/wsc:l…"   
+phpapa0cwes8        wochuservercenter_web.3       lucifery/wsc:latest   localhost.localdomain   Running             Running about a minute ago                                       
+85uy3y02bik8        wochuservercenter_web.4       lucifery/wsc:latest   localhost.localdomain   Running             Running 56 seconds ago                                           
+wh8ugv6mbddh         \_ wochuservercenter_web.4   lucifery/wsc:latest   localhost.localdomain   Shutdown            Rejected about a minute ago   "No such image: lucifery/wsc:l…"   
+cs82sehyiu1o        wochuservercenter_web.5       lucifery/wsc:latest   localhost.localdomain   Running             Running 51 seconds ago                                           
+cq8y5cxx6iqq         \_ wochuservercenter_web.5   lucifery/wsc:latest   localhost.localdomain   Shutdown            Rejected 56 seconds ago       "No such image: lucifery/wsc:l…"   
+1qnvvy2f1b65         \_ wochuservercenter_web.5   lucifery/wsc:latest   localhost.localdomain   Shutdown            Rejected about a minute ago   "No such image: lucifery/wsc:l…"   
+
+docker stack deploy -c docker-compose.yml wochuservercenter  # 迭代和更新集群
+
+[root@localhost wsc]# docker stack ps wochuservercenter
+ID                  NAME                          IMAGE                 NODE                DESIRED STATE       CURRENT STATE                 ERROR                              PORTS
+nfkpprkwsdz6        wochuservercenter_web.1       lucifery/wsc:latest   node1               Running             Running 36 seconds ago                                           
+pk7wce0nik01         \_ wochuservercenter_web.1   lucifery/wsc:latest   node1               Shutdown            Shutdown 37 seconds ago                                          
+v18whw6frln9        wochuservercenter_web.2       lucifery/wsc:latest   node2               Running             Running about a minute ago                                       
+z30lx63jx0u2         \_ wochuservercenter_web.2   lucifery/wsc:latest   node1               Shutdown            Shutdown about a minute ago                                      
+lvic42botjh6         \_ wochuservercenter_web.2   lucifery/wsc:latest   node2               Shutdown            Rejected 27 minutes ago       "No such image: lucifery/wsc:l…"   
+chxa22ig7d87         \_ wochuservercenter_web.2   lucifery/wsc:latest   node2               Shutdown            Rejected 27 minutes ago       "No such image: lucifery/wsc:l…"   
+wqjylqqucnql        wochuservercenter_web.3       lucifery/wsc:latest   node1               Running             Running 50 seconds ago                                           
+phpapa0cwes8         \_ wochuservercenter_web.3   lucifery/wsc:latest   node1               Shutdown            Shutdown 51 seconds ago                                          
+dmwicodpalha        wochuservercenter_web.4       lucifery/wsc:latest   node2               Running             Running about a minute ago                                       
+85uy3y02bik8         \_ wochuservercenter_web.4   lucifery/wsc:latest   node1               Shutdown            Shutdown about a minute ago                                      
+wh8ugv6mbddh         \_ wochuservercenter_web.4   lucifery/wsc:latest   node2               Shutdown            Rejected 27 minutes ago       "No such image: lucifery/wsc:l…"   
+z75ib4j3m25c        wochuservercenter_web.5       lucifery/wsc:latest   node2               Running             Running about a minute ago                                       
+cs82sehyiu1o         \_ wochuservercenter_web.5   lucifery/wsc:latest   node1               Shutdown            Shutdown about a minute ago                                      
+cq8y5cxx6iqq         \_ wochuservercenter_web.5   lucifery/wsc:latest   node2               Shutdown            Rejected 27 minutes ago       "No such image: lucifery/wsc:l…"   
+1qnvvy2f1b65         \_ wochuservercenter_web.5   lucifery/wsc:latest   node2               Shutdown            Rejected 27 minutes ago       "No such image: lucifery/wsc:l…"   
+
+[root@localhost wsc]# hostname
+node1
+[root@localhost wsc]# docker ps
+CONTAINER ID        IMAGE                 COMMAND                  CREATED              STATUS              PORTS               NAMES
+6fa0ad1e9fbc        lucifery/wsc:latest   "/usr/local/python-3…"   About a minute ago   Up About a minute                       wochuservercenter_web.1.nfkpprkwsdz6kaoyiz8fzgt52
+267ab4065384        lucifery/wsc:latest   "/usr/local/python-3…"   About a minute ago   Up About a minute                       wochuservercenter_web.3.wqjylqqucnqldjn7lk91tpwq1
+
+[root@localhost ~]# hostname
+node2
+[root@localhost ~]# docker ps
+CONTAINER ID        IMAGE                 COMMAND                  CREATED             STATUS              PORTS                  NAMES
+1996517151d6        lucifery/wsc:latest   "/usr/local/python-3…"   2 minutes ago       Up 2 minutes                               wochuservercenter_web.2.v18whw6frln9tsbf2rk5pk4zl
+da211108712a        lucifery/wsc:latest   "/usr/local/python-3…"   2 minutes ago       Up 2 minutes                               wochuservercenter_web.4.dmwicodpalhavrsglph8vy1ob
+3b6df8d185fe        lucifery/wsc:latest   "/usr/local/python-3…"   2 minutes ago       Up 2 minutes                               wochuservercenter_web.5.z75ib4j3m25c65r9mof8nq661
+
+
+##  stack
+[root@localhost wsc]# docker stack rm wochuservercenter    # 先停止之前的服务
+Removing service wochuservercenter_web
+Removing network wochuservercenter_webnet
+
+[root@localhost wsc]# docker service ls
+ID                  NAME                MODE                REPLICAS            IMAGE               PORTS
+[root@localhost wsc]# docker stack deploy -c docker-compose.yml wsc     #创建新的服务
+Creating service wsc_visualizer
+Creating service wsc_web
+
+[root@localhost wsc]# docker stack ls
+NAME                SERVICES            ORCHESTRATOR
+wsc                 2                   Swarm
+
+[root@localhost wsc]# docker service ls
+ID                  NAME                MODE                REPLICAS            IMAGE                             PORTS
+daby00p8swqg        wsc_visualizer      replicated          0/1                 dockersamples/visualizer:stable   *:8080->8080/tcp
+nwx7bmnn9eb7        wsc_web             replicated          5/5                 lucifery/wsc:latest               *:80->8000/tcp
+
+[root@localhost wsc]# docker service ps wsc_visualizer
+ID                  NAME                IMAGE                             NODE                DESIRED STATE       CURRENT STATE                ERROR               PORTS
+nenwol3v7rqu        wsc_visualizer.1    dockersamples/visualizer:stable   node1               Running             Running about a minute ago    
+                   
+[root@localhost wsc]# docker service ps wsc_web
+ID                  NAME                IMAGE                 NODE                DESIRED STATE       CURRENT STATE           ERROR               PORTS
+gxcpa2rtrgp5        wsc_web.1           lucifery/wsc:latest   node1               Running             Running 3 minutes ago                       
+1w0colra9x54        wsc_web.2           lucifery/wsc:latest   node2               Running             Running 3 minutes ago                       
+4qqank4kndgn        wsc_web.3           lucifery/wsc:latest   node2               Running             Running 3 minutes ago                       
+acfqdwm45ka5        wsc_web.4           lucifery/wsc:latest   node1               Running             Running 3 minutes ago                       
+kif0vaqachyr        wsc_web.5           lucifery/wsc:latest   node2               Running             Running 3 minutes ago  
+
+# 增加持久化存储 redis
+[root@localhost wsc]# docker stack deploy -c docker-compose.yml wsc
+Updating service wsc_web (id: nwx7bmnn9eb7ycu39xvgrvcd2)
+image lucifery/wsc:latest could not be accessed on a registry to record
+its digest. Each node will access lucifery/wsc:latest independently,
+possibly leading to different nodes running different
+versions of the image.
+
+Updating service wsc_visualizer (id: daby00p8swqgxjweygmhhrj5p)
+Creating service wsc_redis
+
+
+[root@localhost wsc]# docker service ls
+ID                  NAME                MODE                REPLICAS            IMAGE                             PORTS
+jn0h4q4tapnf        wsc_redis           replicated          0/1                 redis:latest                      *:6379->6379/tcp
+daby00p8swqg        wsc_visualizer      replicated          1/1                 dockersamples/visualizer:stable   *:8080->8080/tcp
+nwx7bmnn9eb7        wsc_web             replicated          5/5                 lucifery/wsc:latest               *:80->8000/tcp
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+docker stack ls                                            # List stacks or apps
+docker stack deploy -c <composefile> <appname>  # Run the specified Compose file
+docker service ls                 # List running services associated with an app
+docker service ps <service>                  # List tasks associated with an app
+docker inspect <task or container>                   # Inspect task or container  
+docker container ls -q                                      # List container IDs
+docker stack rm <appname>                             # Tear down an application
+docker swarm leave --force      # Take down a single node swarm from the manager
+
+
+[root@localhost wsc]# docker system df
+TYPE                TOTAL               ACTIVE              SIZE                RECLAIMABLE
+Images              19                  4                   2.485GB             1.382GB (55%)
+Containers          13                  4                   3.321MB             2.657MB (79%)
+Local Volumes       2                   1                   491.7MB             281MB (57%)
+Build Cache         0                   0                   0B                  0B
+
+
+docker inspect jenkins  #查看jenkins镜像的详细信息
+
+
+## apline linux
+apk add uwsgi-python3=2.0.17-r1
+apk add gcc build-base python3-dev
+uwsgi --chdir /web  --plugin python3 --wsgi-file  ./WochuServerCenter/wsgi.py --static-map /static=/web/static --pidfile=/var/run/wsc.pid --master --processes=2 --threads=4 --http-socket 0.0.0.0:8000
+docker build  --no-cache -t wsc-alpline:v4 --build-arg username=username --build-arg password=password .
+docker run -d  -v /data/web/WochuServerCenter:/web -p 83:50001 wsc-alpine:v1
+docker run -d -v /data/log:/web/WochuServerCenter/log -p 83:50001 wsc-alpline:v5
+
+
+
+## rabbitmq 官方镜像使用
+#docker run -d --hostname my-rabbit --name some-rabbit rabbitmq:3
+#docker run -d --hostname my-rabbit --name some-rabbit -e RABBITMQ_ERLANG_COOKIE='secret cookie here' rabbitmq:3
+#docker run -d --hostname my-rabbit --name some-rabbit rabbitmq:3-management
+#docker run -d --hostname my-rabbit --name some-rabbit -e RABBITMQ_DEFAULT_USER=user -e RABBITMQ_DEFAULT_PASS=password rabbitmq:3-management
+#docker run -d --hostname wochu-rabbit --name wochu-rabbit -e RABBITMQ_ERLANG_COOKIE='wochu cookie here' -e RABBITMQ_DEFAULT_USER=wochu -e RABBITMQ_DEFAULT_PASS=wochu123  rabbitmq:3.6-management-alpine
+docker run -d  -p 15672:15672 -p 5672:5672 -p 25672:25672 --hostname wochu-rabbit --name wochu-rabbit -e RABBITMQ_ERLANG_COOKIE='wochu cookie here' -e RABBITMQ_DEFAULT_USER=wochu -e RABBITMQ_DEFAULT_PASS=wochu123  rabbitmq:3.6-management-alpine
+4369 – erlang发现口
+5672 –client端通信口
+15672 – 管理界面ui端口
+25672 – server间内部通信口
+
+
+## mongo
+#docker run -d --name some-mongo -e MONGO_INITDB_ROOT_USERNAME=mongoadmin -e MONGO_INITDB_ROOT_PASSWORD=secret mongo
+#docker run --name some-mongo -v /my/own/datadir:/data/db -d mongo
+docker run -d --name some-mongo -v /data/mongo:/data/db -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=mongoadmin -e MONGO_INITDB_ROOT_PASSWORD=secret mongo
+
+## consul
+docker run -d -p 8500:8500 consul consul agent -data-dir=/consul/data -config-dir=/consul/config -dev -client=0.0.0.0 -bind=0.0.0.0
+http://127.0.0.1:8500/ui
+
+## Prometheus
+# 参考链接 
+1.运行Node Exporter
+#https://github.com/prometheus/node_exporter
+#错误 供参考docker run -d -p 9100:9100 -v /proc:/host/proc -v /sys:/host/sys -v /:/rootfs --net=host prom/node-exporter -collector.procfs /host/proc -collector.sysfs /host/sys -collector.filesystem.ignored-mount-points "^/(sys|proc|dev|host|etc)($|/)"
+docker run -d -p 9100:9100 -v "/proc:/host/proc" -v "/sys:/host/sys" -v "/:/rootfs" --net=host prom/node-exporter --path.procfs /host/proc --path.sysfs /host/sys --collector.filesystem.ignored-mount-points "^/(sys|proc|dev|)"
+#docker run -d -p 9100:9100  --net="host" --pid="host" --name node-exporter -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter --path.rootfs /host
+浏览器中通过http://ip:9100/metrics测试一下
+2.运行cadvisor
+docker run -d -p 8080:8080 --network host --name cadvisor -v /:/rootfs:ro -v /var/run:/var/run:rw -v /sys:/sys:ro -v /var/lib/docker/:/var/lib/docker:ro google/cadvisor:latest
+http://ip:8080/metrics测试
+3.运行prometheus
+mkdir /root/prometheus
+vi /root/prometheus/prometheus.yml
+----------------------------------------------------------------
+global:
+  scrape_interval:     15s # By default, scrape targets every 15 seconds.
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager).
+  external_labels:
+    monitor: 'codelab-monitor'
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['localhost:9090','localhost:8080','localhost:9100','192.168.14.33:8080','192.168.14.33:9100']
+----------------------------------------------------------------
+docker run -d -p 9090:9090 -v /root/prometheus:/etc/prometheus --name prometheus --network host prom/prometheus
+可以通过http://ip:9090/metrics测试一下
+http://ip:9090/graph
+http://192.168.14.35:9090/targets
+4.运行grafana
+docker run -d -p 3000:3000 --name=grafana --network host  -e "GF_SERVER_ROOT_URL=http://grafana.server.name" -e "GF_SECURITY_ADMIN_PASSWORD=secret"  grafana/grafana
+注：这里我们依然使用的是host网络，这样grafana可以直接与prometheus server进行通信 -e "GF_SECURITY_ADMIN_PASSWORD=secret" 指定了grafana admin用户密码：secret
+grafana启动后。在浏览器中打开http://ip:3000
+ 登录后，grafana将引导我们配置Data source
+Name为data source命名
+例如：prometheus
+Type选择prometheus
+Url输入：prometheus server的地址：http://ip:9090
+其他值保持默认，点击add
+
+现在grafana就可以访问prometheus server中存放的数据了，那么如何让展示呢？
+grafana是通过dashboard展示数据的，在dashboard中需要定义
+	1.展示prometheus的那些数据？需要给出具体的查询语句表达式
+	2.用什么形式展示，比如：二维线性图，仪表图，各种坐标的含义
+可见要做出一个dashboard也是一件不容易的事情。还好，我们可以借助开源社区的力量，直接俄使用现成的dashboard。
+访问：https://grafana.com/dashboards?dataSource=prometheus&search=docker
+，将会看到很多用于监控docker的dashboard  下载 并在grafana中导入
+例如 https://grafana.com/dashboards/893/revisions
+
+
+
+## ELk
+#https://elk-docker.readthedocs.io/
+vi /etc/sysctl.conf
+vm.max_map_count=262145
+systctl -p
+docker run -p 5601:5601 -p 9200:9200 -p 5044:5044 -it --name elk   sebp/elk
+5601: Kibana web接口访问 http://ip:5601 访问kibana
+9200： Elasticsearch JSON接口 访问http://ip:9200/_search?pretty
+5044：Logstash 日志接收接口
+
+
+安装filebeat
+#https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-installation.html
+curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-6.4.2-x86_64.rpm
+rpm -vi filebeat-6.4.2-x86_64.rpm
+
+vim /etc/filebeat/filebeat.yml
+enabled: true
+paths:
+    - /var/lib/docker/containers/*/*.log
+    - /var/log/syslog
+output.elasticsearch:
+  # Array of hosts to connect to.
+  hosts: ["192.168.14.33:9200"]
+systemctl start filebeat.service
+访问http://ip:9200/_search?pretty 查看是否有index了
+
+配置kibanna - management - kibana - index patterns
+
+运行一个测试输出日志容器
+docker run busybox sh -c 'while true;do echo "this is a log message from container busybox";sleep 5;done;'
+docker run busybox sh -c 'while true;do echo "this is a log message from container busybox";sleep $(($RANDOM%20+1));done;'
+在Kibana web接口访问 http://ip:5601  - discover - 输入 busybox 来查看生成的日志
+
+
+## docker 登陆阿里镜像仓库并上传镜像
+[root@node2 ~]# docker login --username=lucifery registry.cn-hangzhou.aliyuncs.com
+Password: 
+WARNING! Your password will be stored unencrypted in /root/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Login Succeeded
+[root@node2 ~]# docker tag wsc-alpline:v9 registry.cn-hangzhou.aliyuncs.com/yuzhiyi/wochu-docker-images:v1
+[root@node2 ~]# docker push registry.cn-hangzhou.aliyuncs.com/yuzhiyi/wochu-docker-images:v1
+The push refers to repository [registry.cn-hangzhou.aliyuncs.com/yuzhiyi/wochu-docker-images]
+be6ea1cd6b1b: Pushed 
+06fcd97cb76b: Pushed 
+1ef9434df6e2: Pushed 
+e76884041b1d: Pushed 
+da1a9d273814: Pushed 
+df64d3292fd6: Pushed 
+v1: digest: sha256:1c3da8d5a36a66723dbff16d486044e33db0ea761ee3a3a6facb41fc1533d694 size: 1586
+
+
+## mysql
+#docker run --name some-mysql -e MYSQL_ROOT_PASSWORD=my-secret-pw -d mysql:tag --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+#docker run --name some-mysql -v /my/own/datadir:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=my-secret-pw -d mysql:tag
+docker run --name apollodb -v /data/mysql:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=wochu@123 -p 3306:3306 -d mysql:5.7 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+[root@node1 mysql]# docker exec -it apollodb /bin/sh
+# mysql -hlocalhost -uroot -pwochu@123
+mysql> grant all privileges on *.* to 'root'@'%' identified by 'wochu@123' with grant option;
+mysql> flush privileges
+
+
+##redis
+docker run -v ~/redis.conf:/usr/local/etc/redis/redis.conf -d -p 6379:6379 -v ~/redis-data:/var/lib/redis   --name myredis redis:5.0.1-alpine redis-server /usr/local/etc/redis/redis.conf
+
+## 参考文献
+Docker官方英文资源
+docker官网：http://www.docker.com
+
+Docker windows入门：https://docs.docker.com/windows/
+
+Docker Linux 入门：https://docs.docker.com/linux/
+
+Docker mac 入门：https://docs.docker.com/mac/
+
+Docker 用户指引：https://docs.docker.com/engine/userguide/
+
+Docker 官方博客：http://blog.docker.com/
+
+Docker Hub: https://hub.docker.com/
+
+Docker开源： https://www.docker.com/open-source
+
+Docker中文资源
+Docker中文网站：https://www.docker-cn.com/
+
+Docker安装手册：https://docs.docker-cn.com/engine/installation/
+
+Docker 国内镜像
+网易加速器：http://hub-mirror.c.163.com
+
+官方中国加速器：https://registry.docker-cn.com
+
+ustc的镜像：https://docker.mirrors.ustc.edu.cn
+
+daocloud：https://www.daocloud.io/mirror#accelerator-doc（注册后使用）
+
+
+rabbitmq
+docker run -it --rm --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management

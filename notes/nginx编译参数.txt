@@ -1,0 +1,52 @@
+yum -y install gcc openssl openssl-devel pcre-devel libvpx-devel libjpeg-devel libpng-devel libXpm-devel libfreetype6-dev gmp-devel libtidy-devel bzip2-devel curl-devel libxml2-devel libxml2 libxslt-devel libfreetype6-dev pcre-devel gcc openssl openssl-devel perl-devel perl-ExtUtils-Embed gd-devel geoip-devel -y
+
+apt-get install -y build-essential tcl gcc make zlib1g-dev libgd2-xpm-dev libperl-dev libgeoip-dev libssl-dev libncursesw5-dev libgdbm-dev libc6-dev libffi-dev openssl libxml2-dev libpcre3 libpcre3-dev libncurses5-dev libicu-dev libfreetype6-dev libmcrypt-dev libcurl4-gnutls-dev libjpeg-dev libpng-dev libxslt1-dev telnet curl sysstat nmap iptraf tcpdump mtr ifstat lrzsz tree
+
+./configure --prefix=/data/exec/nginx_1.16.1 --modules-path=/data/exec/nginx_1.16.1/modules --error-log-path=/data/log/nginx/error.log  --http-log-path=/data/log/nginx/access.log --pid-path=/data/run/nginx.pid --lock-path=/data/run/nginx.lock  --with-http_ssl_module  --with-http_realip_module --with-http_addition_module --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_random_index_module --with-http_secure_link_module --with-http_stub_status_module --with-http_auth_request_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_perl_module=dynamic --with-threads --with-stream --with-stream_ssl_module --with-http_slice_module --with-mail --with-mail_ssl_module --with-file-aio --with-ipv6 --with-http_v2_module --with-cc-opt='-O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector --param=ssp-buffer-size=4 -m64 -mtune=generic' 
+
+
+
+
+[root@10.110.76.1 ~]# /data/exec/nginx/sbin/nginx -V
+nginx version: nginx/1.10.1
+built by gcc 4.4.7 20120313 (Red Hat 4.4.7-11) (GCC) 
+built with OpenSSL 1.0.1t  3 May 2016
+TLS SNI support enabled
+configure arguments: --prefix=/data/exec/nginx_1.10.1 --modules-path=/data/exec/nginx_1.10.1/modules --with-http_ssl_module --with-http_realip_module --with-http_addition_module --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_random_index_module --with-http_secure_link_module --with-http_stub_status_module --with-http_auth_request_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_perl_module=dynamic --with-threads --with-stream --with-stream_ssl_module --with-http_slice_module --with-mail --with-mail_ssl_module --with-file-aio --with-ipv6 --with-http_v2_module --with-cc-opt='-O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector --param=ssp-buffer-size=4 -m64 -mtune=generic' --with-openssl=/var/ftp/src/openssl-1.0.1t
+
+
+./configure \
+--prefix=/data/exec/nginx_1.16.1 \
+--modules-path=/data/exec/nginx_1.16.1/modules \
+--error-log-path=/data/log/nginx  \
+--http-log-path=/data/log/nginx \
+--pid-path=/data/run \
+--lock-path=/data/run \ 
+--with-http_ssl_module \ 
+--with-http_realip_module \
+--with-http_addition_module \
+--with-http_sub_module \
+--with-http_dav_module \
+--with-http_flv_module \
+--with-http_mp4_module \
+--with-http_gunzip_module \
+--with-http_gzip_static_module \
+--with-http_random_index_module \
+--with-http_secure_link_module \
+--with-http_stub_status_module \
+--with-http_auth_request_module \
+--with-http_xslt_module=dynamic \
+--with-http_image_filter_module=dynamic \
+--with-http_geoip_module=dynamic \
+--with-http_perl_module=dynamic \
+--with-threads \
+--with-stream \
+--with-stream_ssl_module \
+--with-http_slice_module \
+--with-mail \
+--with-mail_ssl_module \
+--with-file-aio \
+--with-ipv6 \
+--with-http_v2_module \
+--with-cc-opt='-O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector --param=ssp-buffer-size=4 -m64 -mtune=generic' \
+ --with-openssl=/usr/lib64

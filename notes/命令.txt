@@ -1,0 +1,197 @@
+
+
+###logstash
+/usr/share/logstash/bin/logstash -f  /etc/logstash/conf.d/packetbeat.conf -t
+/usr/share/logstash/bin/logstash -f  /etc/logstash/conf.d/packetbeat.conf --config.reload.automatic
+/usr/share/logstash/bin/logstash -f  /etc/logstash/pipelines2.yml --config.reload.automatic
+
+
+rm -rf /root/logstash-7.4.0/data/plugins/inputs/file/*
+vim /root/logstash-7.4.0/config/cms-api-warning.conf
+/root/logstash-7.4.0/bin/logstash -f /root/logstash-7.4.0/config/cms-api-warning.conf 
+/root/logstash-7.4.0/bin/logstash -f /root/logstash-7.4.0/config/conf/ -t
+/root/logstash-7.4.0/bin/logstash -f /root/logstash-7.4.0/config/conf/ --config.reload.automatic
+
+
+
+###packetbeat
+packetbeat run -e --path.config /etc/packetbeat/packetbeat.yml
+tail -f /var/log/packetbeat/packetbeat
+service packetbeat start
+
+###elasticsearch
+关闭防火墙
+systemctl stop firewalld
+systemctl disable firewalld
+
+elasticsearch 不能以root运行，单机要修改配置文件的node，修改网络接口 
+/etc/security/limits.conf
+*        hard    nproc           4096
+*        soft    nproc           4096
+*        hard    nofile          65535
+*        soft    nofile          65535
+elk     soft memlock unlimited
+elk     hard memlock unlimited
+
+对于systemd管理的 例如centos7
+vim /etc/systemd/system.conf
+
+DefaultLimitNOFILE=65536
+DefaultLimitNPROC=32000
+DefaultLimitMEMLOCK=infinity
+
+
+/etc/sysctl.conf
+vm.max_map_count=262144
+
+useradd elk
+passwd elk
+chown -R elk:elk elasticsearch-7.4.1/
+
+cat ./elasticsearch-7.4.1/config/jvm.options
+-Xms1g
+-Xmx1g
+
+
+更改 config 下配置文件的端口
+vim elasticsearch-7.4.1/config/elasticsearch.yml
+network.host: 192.168.107.128
+node.name: node-1
+cluster.initial_master_nodes: ["node-1"]
+
+启动
+~/elasticsearch-7.4.1/bin/elasticsearch
+已服务的方式启动
+./elasticsearch-7.4.1/bin/elasticsearch -d
+
+开机启动
+chmod +x  /etc/rc.d/rc.local
+vim /etc/rc.loal
+ulimit -l unlimited  # 对于centos 增加一下 零时解决
+sudo -u elk /home/elk/elasticsearch-7.4.1/bin/elasticsearch -d
+
+http://192.168.107.128:9200/_cat/health?v   查看健康状态
+poch      timestamp cluster       status node.total node.data shards pri relo init unassign pending_tasks max_task_wait_time active_shards_percent
+1571908772 09:19:32  elasticsearch green           1         1      0   0    0    0        0             0                  -                100.0%
+
+
+#带用户名的访问 
+curl http://elastic:com.0123@172.16.6.151:9200/_cat/health?v
+curl http://elastic:com.0123@172.16.6.151:9200/_cat/nodes?v 
+
+
+http://192.168.107.131:9200/_cat/nodes?v   查看节点信息
+ip              heap.percent ram.percent cpu load_1m load_5m load_15m node.role master name
+192.168.107.132           12          96  87    1.03    0.29     0.20 dilm      -      node-2
+192.168.107.133            9          96   3    0.04    0.11     0.10 dilm      *      node-3
+192.168.107.131           11          96   5    0.30    0.22     0.16 dilm      -      node-1
+
+配置es集群证书，为多用户权限控制做准备
+/home/elk/elasticsearch-7.4.1/bin/elasticsearch-certutil cert -out /home/elk/elasticsearch-7.4.1/config/elastic-certificates.p12 -pass ""  #生成证书到配置文件目录
+chmod 644 /home/elk/elasticsearch-7.4.1/config/elastic-certificates.p12   # 修改证书权限
+vim /home/elk/elasticsearch-7.4.1/config/elasticsearch.yml 
+xpack.security.enabled: true
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: certificate
+xpack.security.transport.ssl.keystore.path: /home/elk/elasticsearch-7.4.1/config/elastic-certificates.p12
+xpack.security.transport.ssl.truststore.path: /home/elk/elasticsearch-7.4.1/config/elastic-certificates.p12
+
+将证书在另2台节点中复制，并修改配置文件重启
+
+在第一台添加密码
+/home/elk/elasticsearch-7.4.1/bin/elasticsearch-setup-passwords interactive
+[elk@localhost bin]$ /home/elk/elasticsearch-7.4.1/bin/elasticsearch-setup-passwords interactive
+Initiating the setup of passwords for reserved users elastic,apm_system,kibana,logstash_system,beats_system,remote_monitoring_user.
+You will be prompted to enter passwords as the process progresses.
+Please confirm that you would like to continue [y/N]y
+
+
+Enter password for [elastic]: 
+Reenter password for [elastic]: 
+Enter password for [apm_system]: 
+Reenter password for [apm_system]: 
+Enter password for [kibana]: 
+Reenter password for [kibana]: 
+Enter password for [logstash_system]: 
+Reenter password for [logstash_system]: 
+Enter password for [beats_system]: 
+Reenter password for [beats_system]: 
+Enter password for [remote_monitoring_user]: 
+Reenter password for [remote_monitoring_user]: 
+Changed password for user [apm_system]
+Changed password for user [kibana]
+Changed password for user [logstash_system]
+Changed password for user [beats_system]
+Changed password for user [remote_monitoring_user]
+Changed password for user [elastic]
+
+
+### kibana
+[elk@localhost ~]$ openssl rand -base64 32
+mK90S3GIfuUzT0cqa3gCRG9RGJW4VcTtMzmFfCKK9w4=
+
+
+
+vim config/kibana.yml
+server.host: "192.168.107.128"
+elasticsearch.hosts: ["http://192.168.107.128:9200"]
+i18n.locale: "zh-CN"
+xpack.security.encryptionKey: "mK90S3GIfuUzT0cqa3gCRG9RGJW4VcTtMzmFfCKK9w4="
+xpack.encrypted_saved_objects.encryptionKey: "mK90S3GIfuUzT0cqa3gCRG9RGJW4VcTtMzmFfCKK9w4="
+xpack.reporting.encryptionKey: "mK90S3GIfuUzT0cqa3gCRG9RGJW4VcTtMzmFfCKK9w4="
+
+启动
+./bin/kibana
+或
+nohup ~/kibana-7.4.1-linux-x86_64/bin/kibana > ~/log/kibana.log 2>&1  &
+
+访问
+http://192.168.107.128:5601
+
+
+### filebeat
+filebeat test config -e
+service filebeat status
+
+service filebeat stop  停止服务
+rm /var/lib/filebeat/registry/filebeat/*  删除指针文件 重新读取日志
+vim /etc/filebeat/filebeat.yml   修改配置文件
+service filebeat start  启动服务
+
+
+
+索引设置
+  "settings": {
+	"number_of_shards" : 3,
+	"number_of_replicas" : 2,
+	"refresh_interval": "10s"
+	}
+login 映射案例
+{"properties":{
+  "log_type":{"type":"text"},
+  "time":{"type":"date","format":"yyyy-MM-dd HH:mm:ss"},
+  "device_id":{"type":"text"},
+  "game_id":{"type":"text"},
+  "ip":{"type":"ip"},
+  "channel_id":{"type":"text"},
+  "os":{"type":"text"},
+  "os_version":{"type":"text"},
+  "model":{"type":"text"},
+  "phone":{"type":"text"},
+  "idfa_imei":{"type":"text"},
+  "network_type":{"type":"text"},
+  "uuid":{"type":"text"},
+  "isp":{"type":"text"},
+  "isp_parse":{"type":"text"},
+  "province":{"type":"text"},
+  "city":{"type":"text"},
+  "region":{"type":"text"},
+  "consuming_time":{"type":"float"},
+  "error_code":{"type":"integer"},
+  "error_msg":{"type":"text"},
+  "ad_id":{"type":"text"},
+  "qita1":{"type":"text"},
+  "qita2":{"type":"text"},
+  "qita3":{"type":"text"}
+  }
+}

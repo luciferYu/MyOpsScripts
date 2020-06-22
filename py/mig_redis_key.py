@@ -65,7 +65,7 @@ def migrate_key(src,dest,prefix):
 
 
 if __name__ == '__main__':
-    SRC_HOST_PORT_DB = ('192.168.8.239',6379,4)
+    SRC_HOST_PORT_DB = ('192.168.8.239',6379,2)
     DEST_HOST_PORT_DB = ('192.168.8.239',6379,6)
     KEY_PREFIX = None
     #KEY_PREFIX = 'WSHY*'

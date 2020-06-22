@@ -1,0 +1,425 @@
+## 创建一个集群
+$ minikube version # 查看版本
+minikube version: v0.28.2
+
+
+$ minikube start  #启动minikube集群
+Starting local Kubernetes v1.10.0 cluster...
+Starting VM...
+Getting VM IP address...
+Moving files into cluster...
+Setting up certs...
+Connecting to cluster...
+Setting up kubeconfig...
+Starting cluster components...
+Kubectl is now configured to use the cluster.
+Loading cached images from config file.
+
+$ kubectl version #查看版本
+Client Version: version.Info{Major:"1", Minor:"11", GitVersion:"v1.11.0", GitCommit:"91e7b4fd31fcd3d5f436da26c980becec37ceefe", GitTreeState:"clean", BuildDate:"2018-06-27T20:17:28Z", GoVersion:"go1.10.2", Compiler:"gc", Platform:"linux/amd64"}
+Server Version: version.Info{Major:"1", Minor:"10", GitVersion:"v1.10.0", GitCommit:"fc32d2f3698e36b93322a3465f63a14e9f0eaead", GitTreeState:"clean", BuildDate:"2018-04-10T12:46:31Z", GoVersion:"go1.9.4", Compiler:"gc", Platform:"linux/amd64"}
+
+## 部署一个应用
+$ kubectl cluster-info  # 查看集群信息
+Kubernetes master is running at https://172.17.0.10:8443
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+$ kubectl get nodes  #查看所有节点
+NAME       STATUS    ROLES     AGE       VERSION
+minikube   Ready     <none>    10m       v1.10.0
+
+$ kubectl --help  # 显示帮助
+
+$ kubectl run kubernetes-bootcamp --image=gcr.io/google-samples/kubernetes-bootcamp:v1 --port=8080  #部署一个名为 kubernetes-bootcamp的应用 指定了镜像和端口
+deployment.apps/kubernetes-bootcamp created
+
+$ kubectl get deployments  #查看部署的应用
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   1         1         1            1           1m
+
+
+$ kubectl proxy  #开启一个新的代理
+Starting to serve on 127.0.0.1:8001
+
+$ curl http://localhost:8001/version  # 在另一个terminal 通过api获取信息
+{
+  "major": "1",
+  "minor": "10",
+  "gitVersion": "v1.10.0",
+  "gitCommit": "fc32d2f3698e36b93322a3465f63a14e9f0eaead",
+  "gitTreeState": "clean",
+  "buildDate": "2018-04-10T12:46:31Z",
+  "goVersion": "go1.9.4",
+  "compiler": "gc",
+  "platform": "linux/amd64"
+}
+
+$ kubectl get  pods # 获取pod信息
+NAME                                    READY     STATUS    RESTARTS   AGE
+kubernetes-bootcamp-5c69669756-vqppk    1/1       Running   0          14m
+
+
+export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}') # 将pod的那么 输出到环境变量
+$ echo Name of the Pod: $POD_NAME  # 通过环境变量显示
+Name of the Pod: kubernetes-bootcamp-5c69669756-vqppk kubernetes-bootcamp2-6b958cd4f6-gx788
+
+$ curl http://localhost:8001/api/v1/namespaces/default/pods/$POD_NAME/proxy/   # 通过curl获取信息
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kubernetes-bootcamp-5c69669756-vqppk",
+    "generateName": "kubernetes-bootcamp-5c69669756-",
+    "namespace": "default",
+    "selfLink": "/api/v1/namespaces/default/pods/kubernetes-bootcamp-5c69669756-vqppk",
+    "uid": "75255f1b-d8c8-11e8-8bde-0242ac110016",
+    "resourceVersion": "316",
+    "creationTimestamp": "2018-10-26T02:40:10Z",
+
+
+
+##kubectl 常见操作
+$ kubectl get pods  #获得pods的信息
+NAME                                   READY     STATUS    RESTARTS   AGE
+kubernetes-bootcamp-5c69669756-g59cl   1/1       Running   0          55s
+
+$ kubectl describe pods #获取pods的详细信息
+Name:           kubernetes-bootcamp-5c69669756-g59cl
+Namespace:      default
+Node:           minikube/172.17.0.60
+Start Time:     Fri, 26 Oct 2018 03:38:46 +000
+Labels:         pod-template-hash=1725225312
+                run=kubernetes-bootcamp
+Annotations:    <none>
+Status:         Running
+IP:             172.18.0.4
+Controlled By:  ReplicaSet/kubernetes-bootcamp-5c69669756
+Containers:
+  kubernetes-bootcamp:
+    Container ID:   docker://49f5c4b851f5d766507a96f803067c54fab88fce3fd13c6822a8aea7c9d09f49
+    Image:          gcr.io/google-samples/kubernetes-bootcamp:v1
+    Image ID:       docker-pullable://gcr.io/google-samples/kubernetes-bootcamp@sha256:0d6b8ee63bb57c5f5b6156f446b3bc3b3c143d233037f3a2f00e279c8fcc64af
+    Port:           8080/TCP
+    Host Port:      0/TCP
+....	
+
+
+$ kubectl logs $POD_NAME #通过pod name 查看 pods的启动状态
+Kubernetes Bootcamp App Started At: 2018-10-26T05:38:06.797Z | Running On:  kubernetes-bootcamp-5c69669756-hlpts
+
+$ kubectl exec $POD_NAME env
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=kubernetes-bootcamp-5c69669756-hlpts
+KUBERNETES_PORT_443_TCP=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+KUBERNETES_PORT_443_TCP_PORT=443
+KUBERNETES_PORT_443_TCP_ADDR=10.96.0.1
+KUBERNETES_SERVICE_HOST=10.96.0.1
+KUBERNETES_SERVICE_PORT=443
+KUBERNETES_SERVICE_PORT_HTTPS=443
+KUBERNETES_PORT=tcp://10.96.0.1:443
+NPM_CONFIG_LOGLEVEL=info
+NODE_VERSION=6.3.1
+HOME=/root
+
+$ kubectl exec -it $POD_NAME bash
+root@kubernetes-bootcamp-5c69669756-hlpts:/#
+
+root@kubernetes-bootcamp-5c69669756-hlpts:/# cat server.js
+var http = require('http');
+var requests=0;
+var podname= process.env.HOSTNAME;
+var startTime;
+...
+
+
+root@kubernetes-bootcamp-5c69669756-hlpts:/# curl localhost:8080
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-5c69669756-hlpts | v=1
+
+## service 
+一组pod 通过service 与外部世界产生联系
+service 的type类型有4种  
+clusterIP（默认）暴露服务在 internal ip 上，这个类型的服务只能在 cluster内访问
+Node-Port   在所有的Node上暴露相同的port 通过NAT的方式，cluster外部通过 NodeIp：NodePort 的方法来访问
+LoadBalancer  创建一个 external load balancer  并给与固定的外部IP 来
+ExternalName 暴露服务 通过分配一个随机的cname域名 需要kube-dns v1.7更高的版本支持 
+
+
+$ kubectl get service  # 获取服务
+NAME            TYPE          CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+kubernetes     ClusterIP   10.96.0.1        <none>           443/TCP   26s
+
+# 向外暴露接口
+$ kubectl expose deployment/kubernetes-bootcamp --type="NodePort" --port 8080
+service/kubernetes-bootcamp exposed
+$ kubectl get services  # 查看结果
+NAME                             TYPE            CLUSTER-IP      EXTERNAL-IP   PORT(S)               AGE
+kubernetes                      ClusterIP      10.96.0.1          <none>           443/TCP              2m
+kubernetes-bootcamp     NodePort    10.105.20.223   <none>           8080:30237/TCP   34s
+
+# 查看服务状态
+$ kubectl describe service/kubernetes-bootcamp
+Name:                     kubernetes-bootcamp
+Namespace:                default
+Labels:                   run=kubernetes-bootcamp
+Annotations:              <none>
+Selector:                 run=kubernetes-bootcamp
+Type:                     NodePort
+IP:                       10.105.20.223
+Port:                     <unset>  8080/TCP
+TargetPort:               8080/TCP
+NodePort:                 <unset>  30237/TCP
+Endpoints:                172.18.0.2:8080
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+
+#创建一个名为 NODE_PORT的环境变量
+$ export NODE_PORT=$(kubectl get services/kubernetes-bootcamp -o go-template='{{(index .spec.ports 0).nodePort}}')
+$ echo NODE_PORT=$NODE_PORT
+NODE_PORT=30237
+
+curl $(minikube ip):$NODE_PORT #测试服务对外IP 端口
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-5c69669756-ql9qh | v=1
+
+
+
+$ kubectl describe deployment  #查看labels 默认会分配一个
+Name:                   kubernetes-bootcamp
+Namespace:              default
+CreationTimestamp:      Fri, 26 Oct 2018 06:43:16 +0000
+Labels:                 run=kubernetes-bootcamp
+Annotations:            deployment.kubernetes.io/revision=1
+Selector:               run=kubernetes-bootcamp
+Replicas:               1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  run=kubernetes-bootcamp
+...  
+
+$ kubectl get pods -l run=kubernetes-bootcamp # 通过标签找pods 
+NAME                                   READY     STATUS    RESTARTS   AGE
+kubernetes-bootcamp-5c69669756-ql9qh   1/1       Running   0          9m
+
+$ kubectl get services -l run=kubernetes-bootcamp  # 通过标签找服务
+NAME                  TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+kubernetes-bootcamp   NodePort   10.105.20.223   <none>        8080:30237/TCP   8m
+
+$ export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')  # 把POD_NAME环境变量赋值给pod
+$ echo Name of the Pod: $POD_NAME
+Name of the Pod: kubernetes-bootcamp-5c69669756-ql9qh
+
+$ kubectl label pod $POD_NAME app=v1 # 创建一个标签 把 变量pod_name的值作为键 app=v1 作为值得 
+pod/kubernetes-bootcamp-5c69669756-ql9qh labeled
+
+$ kubectl describe pods $POD_NAME  # 查看标签
+Name:           kubernetes-bootcamp-5c69669756-ql9qh
+Namespace:      default
+Node:           minikube/172.17.0.122
+Start Time:     Fri, 26 Oct 2018 06:43:23 +0000
+Labels:         app=v1
+                pod-template-hash=1725225312
+                run=kubernetes-bootcamp
+
+$ kubectl get pods -l app=v1  通过标签获取pod
+NAME                                   READY     STATUS    RESTARTS   AGE
+kubernetes-bootcamp-5c69669756-ql9qh   1/1       Running   0          16m
+
+$ kubectl delete service -l run=kubernetes-bootcamp  # 通过标签删除服务
+service "kubernetes-bootcamp" deleted
+
+$ kubectl get services  # 确认服务已经被删除
+NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   18m
+
+$ curl $(minikube ip):$NODE_PORT  # 通过curl 在外部（服务）也已经连不上服务
+curl: (7) Failed to connect to 172.17.0.122 port 30237: Connection refused
+
+$ kubectl exec -ti $POD_NAME curl localhost:8080  # 但仍然可以从内部（pod）链接到
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-5c69669756-ql9qh | v=1
+
+
+## 扩展
+$ kubectl get deployments  # 获得部署
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE    # Desired 期望的副本数 current 当前的副本数  up-to-date 为了达到匹配的曾经的副本数
+kubernetes-bootcamp   1         1         1            1           3m
+
+$ kubectl scale deployments/kubernetes-bootcamp --replicas=4  # 将副本的数目扩展到4个
+deployment.extensions/kubernetes-bootcamp scaled
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE  # 观察副本的改变
+kubernetes-bootcamp   4         4         4            4           7m
+
+$ kubectl get pods -o wide  # 查看pod的详细信息 
+NAME                                   READY     STATUS    RESTARTS   AGE       IP           NODE
+kubernetes-bootcamp-5c69669756-7l8dw   1/1       Running   0          1m        172.18.0.7   minikube
+kubernetes-bootcamp-5c69669756-9tz4f   1/1       Running   0          1m        172.18.0.6   minikube
+kubernetes-bootcamp-5c69669756-p4gpd   1/1       Running   0          1m        172.18.0.5   minikube
+kubernetes-bootcamp-5c69669756-r54h5   1/1       Running   0          8m        172.18.0.2   minikube
+
+$ kubectl describe deployments/kubernetes-bootcamp  # 注意查看event的事件
+Name:                   kubernetes-bootcamp
+Namespace:              default
+CreationTimestamp:      Fri, 26 Oct 2018 07:54:25 +0000
+Labels:                 run=kubernetes-bootcamp
+Annotations:            deployment.kubernetes.io/revision=1
+Selector:               run=kubernetes-bootcamp
+Replicas:               4 desired | 4 updated | 4 total | 4 available | 0 unavailable
+....
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  9m    deployment-controller  Scaled up replica set kubernetes-bootcamp-5c69669756 to 1
+  Normal  ScalingReplicaSet  2m    deployment-controller  Scaled up replica set kubernetes-bootcamp-5c69669756 to 4
+
+$ kubectl describe services/kubernetes-bootcamp   # 查看对外服务 找到IP地址和端口号
+Name:                     kubernetes-bootcamp
+Namespace:                default
+Labels:                   run=kubernetes-bootcamp
+Annotations:              <none>
+Selector:                 run=kubernetes-bootcamp
+Type:                     NodePort
+IP:                       10.109.145.164
+Port:                     <unset>  8080/TCP
+TargetPort:               8080/TCP
+NodePort:                 <unset>  32230/TCP
+Endpoints:                172.18.0.2:8080,172.18.0.3:8080,172.18.0.4:8080 + 1 more...
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+
+$ export NODE_PORT=$(kubectl get services/kubernetes-bootcamp -o go-template='{{(index .spec.ports 0).nodePort}}')  # 把端口号输出到变量
+$ echo NODE_PORT=$NODE_PORT
+NODE_PORT=32230
+
+$ curl $(minikube ip):$NODE_PORT  # 通过外部访问正常
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-5c69669756-jjw7t | v=1
+
+$ kubectl scale deployments/kubernetes-bootcamp --replicas=2  # 缩容到2个副本
+deployment.extensions/kubernetes-bootcamp scaled
+
+$ kubectl get deployments # 查看结果
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   2         2         2            2           3m
+
+$ kubectl get pods -o wide  # 查看节点内部信息
+NAME                                   READY     STATUS    RESTARTS   AGE       IP           NODE
+kubernetes-bootcamp-5c69669756-hhgsd   1/1       Running   0          3m        172.18.0.2   minikube
+kubernetes-bootcamp-5c69669756-v4sjd   1/1       Running   0          3m        172.18.0.4   minikube
+
+## 滚动升级 Rolling Update
+$ kubectl get deployments    # 查看部署
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   4         4         4            0           5s
+
+$ kubectl get pods  #查看所有的pod
+NAME                                   READY     STATUS    RESTARTS   AGE
+kubernetes-bootcamp-5c69669756-79n9j   1/1       Running   0          37s
+kubernetes-bootcamp-5c69669756-b978n   1/1       Running   0          37s
+kubernetes-bootcamp-5c69669756-gltdx   1/1       Running   0          37s
+kubernetes-bootcamp-5c69669756-lqw8c   1/1       Running   0          37s
+
+
+$ kubectl describe pods  # 注意观察当前使用的镜像的版本
+Name:           kubernetes-bootcamp-5c69669756-79n9j
+Namespace:      default
+Node:           minikube/172.17.0.41
+Start Time:     Fri, 26 Oct 2018 08:22:14 +0000
+Labels:         pod-template-hash=1725225312
+                run=kubernetes-bootcamp
+Annotations:    <none>
+Status:         Running
+IP:             172.18.0.5
+Controlled By:  ReplicaSet/kubernetes-bootcamp-5c69669756
+Containers:
+  kubernetes-bootcamp:
+    Container ID:   docker://c10aaf8dc7eb5b360963371964cca71050326ee5078e677dd6544face161454d
+    Image:          gcr.io/google-samples/kubernetes-bootcamp:v1
+    Image ID:       docker-pullable://gcr.io/google-samples/kubernetes-bootcamp@sha256:0d6b8ee63bb57c5f5b6156f446b3bc3b3c143d233037f3a2f00e279c8fcc64af
+    Port:           8080/TCP
+    Host Port:      0/TCP
+
+$ kubectl set image deployments/kubernetes-bootcamp kubernetes-bootcamp=jocatalin/kubernetes-bootcamp:v2  # 更新镜像版本从v1到v2
+deployment.extensions/kubernetes-bootcamp image updated
+
+$ kubectl get pods  # 观察升级情况
+NAME                                   READY     STATUS        RESTARTS   AGE
+kubernetes-bootcamp-5c69669756-79n9j   1/1       Terminating   0          4m
+kubernetes-bootcamp-5c69669756-b978n   1/1       Terminating   0          4m
+kubernetes-bootcamp-5c69669756-gltdx   1/1       Terminating   0          4m
+kubernetes-bootcamp-5c69669756-lqw8c   0/1       Terminating   0          4m
+kubernetes-bootcamp-7799cbcb86-d76nj   1/1       Running       0          28s
+kubernetes-bootcamp-7799cbcb86-f59rh   1/1       Running       0          30s
+kubernetes-bootcamp-7799cbcb86-ll7xp   1/1       Running       0          28s
+kubernetes-bootcamp-7799cbcb86-p2d8k   1/1       Running       0          30s
+
+$ kubectl describe services/kubernetes-bootcamp  #检查我们的APP 正常运行 ，并看到外网的IP
+Name:                     kubernetes-bootcamp
+Namespace:                default
+Labels:                   run=kubernetes-bootcamp
+Annotations:              <none>
+Selector:                 run=kubernetes-bootcamp
+Type:                     NodePort
+IP:                       10.100.186.241
+Port:                     <unset>  8080/TCP
+TargetPort:               8080/TCP
+NodePort:                 <unset>  30645/TCP
+Endpoints:                172.18.0.10:8080,172.18.0.11:8080,172.18.0.8:8080 + 1 more...
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+
+$ export NODE_PORT=$(kubectl get services/kubernetes-bootcamp -o go-template='{{(index .spec.ports 0).nodePort}}')  #创建端口的环境变量 
+$ echo NODE_PORT=$NODE_PORT
+NODE_PORT=30645
+
+$ curl $(minikube ip):$NODE_PORT  #查看页面 此时版本已经更新为v2
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-7799cbcb86-f59rh | v=2
+
+$ kubectl rollout status deployments/kubernetes-bootcamp  # 通过rollout 命令也可以确认是否成功升级
+deployment "kubernetes-bootcamp" successfully rolled out
+
+$ kubectl describe pods  # 通过describe 再次观察镜像的版本
+
+$ kubectl set image deployments/kubernetes-bootcamp kubernetes-bootcamp=gcr.io/google-samples/kubernetes-bootcamp:v10  # 现在将版本升级到v10 
+deployment.extensions/kubernetes-bootcamp image updated
+$ kubectl get deployments  #再次查看
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   4         5         2            3           10m
+$ kubectl get pods  # 发现一些错误发生
+NAME                                   READY     STATUS         RESTARTS   AGE
+kubernetes-bootcamp-5f76cd7b94-c9m7h   0/1       ErrImagePull   0          9s
+kubernetes-bootcamp-5f76cd7b94-wqksm   0/1       ErrImagePull   0          9s
+kubernetes-bootcamp-7799cbcb86-d76nj   1/1       Running        0          6m
+kubernetes-bootcamp-7799cbcb86-f59rh   1/1       Running        0          6m
+kubernetes-bootcamp-7799cbcb86-ll7xp   1/1       Terminating    0          6m
+kubernetes-bootcamp-7799cbcb86-p2d8k   1/1       Running        0          6m
+
+$ kubectl describe pods  #在event里查看到报错 可以看到镜像的版本是v10
+...
+kubernetes-bootcamp:
+    Container ID:
+    Image:          gcr.io/google-samples/kubernetes-bootcamp:v10
+    Image ID:
+...
+Events:
+  Type     Reason                 Age               From               Message
+  ----     ------                 ----              ----               -------
+  Normal   Scheduled              1m                default-scheduler  Successfully assigned kubernetes-bootcamp-5f76cd7b94-c9m7h to minikube
+  Normal   SuccessfulMountVolume  1m                kubelet, minikube  MountVolume.SetUp succeeded for volume "default-token-j5sjc"
+  Normal   BackOff                13s (x4 over 1m)  kubelet, minikube  Back-off pulling image "gcr.io/google-samples/kubernetes-bootcamp:v10"
+  Warning  Failed                 13s (x4 over 1m)  kubelet, minikube  Error: ImagePullBackOff
+  Normal   Pulling                2s (x4 over 1m)   kubelet, minikube  pulling image "gcr.io/google-samples/kubernetes-bootcamp:v10"
+  Warning  Failed                 2s (x4 over 1m)   kubelet, minikube  Failed to pull image "gcr.io/google-samples/kubernetes-bootcamp:v10": rpc error: code = Unknown desc = unauthorized: authentication required
+  Warning  Failed                 2s (x4 over 1m)   kubelet, minikube  Error: ErrImagePull
+
+$ kubectl rollout undo deployments/kubernetes-bootcamp  #回滚到之前的版本 也就是v2 
+deployment.extensions/kubernetes-bootcamp
+
+$ kubectl get pods  # 查看装填 
+NAME                                   READY     STATUS    RESTARTS   AGE
+kubernetes-bootcamp-7799cbcb86-d76nj   1/1       Running   0          10m
+kubernetes-bootcamp-7799cbcb86-f59rh   1/1       Running   0          10m
+kubernetes-bootcamp-7799cbcb86-mcqzh   1/1       Running   0          26s
+kubernetes-bootcamp-7799cbcb86-p2d8k   1/1       Running   0          10m

@@ -1,0 +1,184 @@
+vim /etc/sysctl.conf
+vm.overcommit_memory=1
+net.core.somaxconn= 1024
+sysctl -p
+
+vim /etc/rc.local
+echo never > /sys/kernel/mm/transparent_hugepage/enabled
+source /etc/rc.local
+
+yum -y install ruby gcc* glibc* tcl
+
+
+gpg --keyserver hkp://keys.gnupg.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 7D2BAF1CF37B13E2069D6956105BD0E739499BDB 
+\curl -sSL https://get.rvm.io | bash -s stable
+source /etc/profile.d/rvm.sh
+
+
+[root@localhost bin]# ruby --version
+ruby 2.0.0p648 (2015-12-16) [x86_64-linux]
+[root@localhost bin]# rvm remove 2.0.0p648
+
+
+[root@localhost user]# pwd
+/usr/local/rvm/user
+[root@localhost user]# echo "ruby_url=https://cache.ruby-china.org/pub/ruby" > db
+
+
+[root@localhost bin]# rvm list known
+# MRI Rubies
+[ruby-]1.8.6[-p420]
+[ruby-]1.8.7[-head] # security released on head
+[ruby-]1.9.1[-p431]
+[ruby-]1.9.2[-p330]
+[ruby-]1.9.3[-p551]
+[ruby-]2.0.0[-p648]
+[ruby-]2.1[.10]
+[ruby-]2.2[.10]
+[ruby-]2.3[.8]
+[ruby-]2.4[.9]
+[ruby-]2.5[.7]
+[ruby-]2.6[.5]
+[ruby-]2.7[.0]
+ruby-head
+
+rvm install ruby-2.7.0
+rvm use ruby-2.7.0
+
+
+gem sources --remove https://rubygems.org/
+gem sources -a https://mirrors.aliyun.com/rubygems/
+gem install redis
+
+
+tar -zxvf   redis-4.0.11.tar.gz
+cd redis-4.0.11
+make MALLOC=libc 
+make PREFIX=/data/exec/redis install
+
+
+配置集群
+port 7000
+cluster-enabled yes
+cluster-config-file nodes.conf
+cluster-node-timeout 5000
+appendonly yes
+
+
+[root@localhost bin]# ./redis-server ../etc/redis.conf 
+8226:C 22 May 14:45:21.328 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+8226:C 22 May 14:45:21.328 # Redis version=4.0.11, bits=64, commit=00000000, modified=0, pid=8226, just started
+8226:C 22 May 14:45:21.328 # Configuration loaded
+8226:M 22 May 14:45:21.330 * No cluster configuration found, I'm 49dd66ce797ef74c7dfb553bddf148cf44e0ff28
+                _._                                                  
+           _.-``__ ''-._                                             
+      _.-``    `.  `_.  ''-._           Redis 4.0.11 (00000000/0) 64 bit
+  .-`` .-```.  ```\/    _.,_ ''-._                                   
+ (    '      ,       .-`  | `,    )     Running in cluster mode
+ |`-._`-...-` __...-.``-._|'` _.-'|     Port: 7000
+ |    `-._   `._    /     _.-'    |     PID: 8226
+  `-._    `-._  `-./  _.-'    _.-'                                   
+ |`-._`-._    `-.__.-'    _.-'_.-'|                                  
+ |    `-._`-._        _.-'_.-'    |           http://redis.io        
+  `-._    `-._`-.__.-'_.-'    _.-'                                   
+ |`-._`-._    `-.__.-'    _.-'_.-'|                                  
+ |    `-._`-._        _.-'_.-'    |                                  
+  `-._    `-._`-.__.-'_.-'    _.-'                                   
+      `-._    `-.__.-'    _.-'                                       
+          `-._        _.-'                                           
+              `-.__.-'                                               
+
+8226:M 22 May 14:45:21.333 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 128.
+8226:M 22 May 14:45:21.333 # Server initialized
+
+
+对3台机器都启动2个redis服务 共6个redis 并记录下唯一ID
+
+
+7000 49dd66ce797ef74c7dfb553bddf148cf44e0ff28
+7001 8467026f18f5899bf0a74ea51f44178700c3f23f
+7002 dd38020a195cd61c0309f1a031a05c4b02b11a59
+7003 94e387ea17e31714fa3682ec34154722701f356f
+7004 37ca8e487d9a5b3dff8bb683736fc77c3425cb1d
+7005 5c384bd65b52afd4ceaa06a9ad81875ba4fac001
+
+
+
+
+ ./redis-trib.rb create --replicas 1 192.168.107.131:7000 192.168.107.131:7001 192.168.107.132:7002 192.168.107.132:7003 192.168.107.133:7004 192.168.107.133:7005
+
+
+
+[root@localhost bin]# ./redis-trib.rb create  --replicas 1 192.168.107.131:7000 192.168.107.131:7001 192.168.107.132:7002 192.168.107.132:7003 192.168.107.133:7004 192.168.107.133:7005
+>>> Creating cluster
+>>> Performing hash slots allocation on 6 nodes...
+Using 3 masters:
+192.168.107.131:7000
+192.168.107.132:7002
+192.168.107.133:7004
+Adding replica 192.168.107.132:7003 to 192.168.107.131:7000
+Adding replica 192.168.107.133:7005 to 192.168.107.132:7002
+Adding replica 192.168.107.131:7001 to 192.168.107.133:7004
+M: 49dd66ce797ef74c7dfb553bddf148cf44e0ff28 192.168.107.131:7000
+   slots:0-5460 (5461 slots) master
+S: 8467026f18f5899bf0a74ea51f44178700c3f23f 192.168.107.131:7001
+   replicates 37ca8e487d9a5b3dff8bb683736fc77c3425cb1d
+M: dd38020a195cd61c0309f1a031a05c4b02b11a59 192.168.107.132:7002
+   slots:5461-10922 (5462 slots) master
+S: 94e387ea17e31714fa3682ec34154722701f356f 192.168.107.132:7003
+   replicates 49dd66ce797ef74c7dfb553bddf148cf44e0ff28
+M: 37ca8e487d9a5b3dff8bb683736fc77c3425cb1d 192.168.107.133:7004
+   slots:10923-16383 (5461 slots) master
+S: 5c384bd65b52afd4ceaa06a9ad81875ba4fac001 192.168.107.133:7005
+   replicates dd38020a195cd61c0309f1a031a05c4b02b11a59
+Can I set the above configuration? (type 'yes' to accept): yes
+>>> Nodes configuration updated
+>>> Assign a different config epoch to each node
+>>> Sending CLUSTER MEET messages to join the cluster
+Waiting for the cluster to join...
+>>> Performing Cluster Check (using node 192.168.107.131:7000)
+M: 49dd66ce797ef74c7dfb553bddf148cf44e0ff28 192.168.107.131:7000
+   slots:0-5460 (5461 slots) master
+   1 additional replica(s)
+S: 94e387ea17e31714fa3682ec34154722701f356f 192.168.107.132:7003
+   slots: (0 slots) slave
+   replicates 49dd66ce797ef74c7dfb553bddf148cf44e0ff28
+M: 37ca8e487d9a5b3dff8bb683736fc77c3425cb1d 192.168.107.133:7004
+   slots:10923-16383 (5461 slots) master
+   1 additional replica(s)
+M: dd38020a195cd61c0309f1a031a05c4b02b11a59 192.168.107.132:7002
+   slots:5461-10922 (5462 slots) master
+   1 additional replica(s)
+S: 8467026f18f5899bf0a74ea51f44178700c3f23f 192.168.107.131:7001
+   slots: (0 slots) slave
+   replicates 37ca8e487d9a5b3dff8bb683736fc77c3425cb1d
+S: 5c384bd65b52afd4ceaa06a9ad81875ba4fac001 192.168.107.133:7005
+   slots: (0 slots) slave
+   replicates dd38020a195cd61c0309f1a031a05c4b02b11a59
+[OK] All nodes agree about slots configuration.
+>>> Check for open slots...
+>>> Check slots coverage...
+[OK] All 16384 slots covered.
+
+
+
+[root@localhost bin]# ./redis-cli -c  -h 192.168.107.131 -p 7000
+192.168.107.131:7000> set foo "bar"
+-> Redirected to slot [12182] located at 192.168.107.133:7004
+OK
+192.168.107.133:7004> set hhello "world"
+-> Redirected to slot [4408] located at 192.168.107.131:7000
+OK
+192.168.107.131:7000> get foo
+-> Redirected to slot [12182] located at 192.168.107.133:7004
+"bar"
+192.168.107.133:7004> get hhello
+-> Redirected to slot [4408] located at 192.168.107.131:7000
+"world"
+192.168.107.131:7000> keys *
+1) "hhello"
+2) "hello"
+192.168.107.131:7000> 
+
+
+
