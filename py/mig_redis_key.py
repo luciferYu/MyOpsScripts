@@ -68,6 +68,6 @@ if __name__ == '__main__':
     SRC_HOST_PORT_DB = ('192.168.8.239',6379,2)
     DEST_HOST_PORT_DB = ('192.168.8.239',6379,6)
     KEY_PREFIX = None
-    #KEY_PREFIX = 'WSHY*'
+    KEY_PREFIX = 'Role*'
 
     migrate_key(SRC_HOST_PORT_DB,DEST_HOST_PORT_DB,KEY_PREFIX)
