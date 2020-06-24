@@ -45,7 +45,7 @@ class webSpider(baseSpider):
 
         try:
             start_time = time.perf_counter()
-            resp = self.session.get(url=url,headers=self.headers,params=params,timeout=1)
+            resp = self.session.get(url=url,headers=self.headers,params=params,timeout=2)
             end_time = time.perf_counter()
             await asyncio.sleep(0.000000001)
 
@@ -56,7 +56,7 @@ class webSpider(baseSpider):
             self.result['used_time'] = used_time
             await asyncio.sleep(0.000000001)
         except Exception as e:
-            print(e)
+            #print(e)
             self.result['code'] = 500
             self.result['used_time'] = 0
 
@@ -73,7 +73,7 @@ class webSpider(baseSpider):
         #payload = json.dumps(payload)
         try:
             start_time = time.perf_counter()
-            resp = self.session.post(url=url, headers=self.headers, params=params,data=payload,timeout=1)
+            resp = self.session.post(url=url, headers=self.headers, params=params,data=payload,timeout=2)
             end_time = time.perf_counter()
             await asyncio.sleep(0.000000001)
             used_time = end_time - start_time
@@ -83,7 +83,7 @@ class webSpider(baseSpider):
             self.result['used_time'] = used_time
             await asyncio.sleep(0.000000001)
         except Exception as e:
-            print(e)
+            #print(e)
             self.result['code'] = 500
             self.result['used_time'] = 0
 
@@ -117,10 +117,10 @@ def worker(queue, c,url,method,payload,header):
 
 if __name__ == '__main__':
     p_num = 24  # 进程数
-    c_num = 100  # 协程数
-    queue = multiprocessing.Manager().Queue(100)
+    c_num = 200  # 协程数
+    queue = multiprocessing.Manager().Queue(1000)
     pool = multiprocessing.Pool(p_num)
-    ret = {'code_200': 0, 'code_none_200': 0, 'total_used_time': 0.0, 'count': 0}
+    ret = {'code_200': 0, 'code_none_200': 0, 'total_used_time': 0.0, 'count': 0,'max_used_time':0.0}
 
     # url = 'https://xclx.00joy.com'
     # method = 'get'
@@ -144,6 +144,8 @@ if __name__ == '__main__':
         #print(value)
         if value['code'] == 200:
             ret['code_200'] += 1
+            if value['used_time'] > ret['max_used_time']:
+                ret['max_used_time'] = value['used_time']
         else:
             ret['code_none_200'] += 1
         ret['total_used_time'] += value['used_time']
@@ -153,7 +155,7 @@ if __name__ == '__main__':
             print(count)
 
     print('end concurrent')
-    ret['avg_used_time'] = ret['total_used_time']/ret['code_200']
+    ret['avg_resp_time'] = ret['total_used_time']/ret['code_200']
 
     pool.close()
     pool.join()
@@ -166,3 +168,4 @@ if __name__ == '__main__':
 
 # grep 114.84.158.180 xclx.00joy.com-access.log |grep -v 18297|awk -F  +0800 '{print $1}'|sort |uniq -c|tail -n 25
 # grep 203.156.235.84 xclx.00joy.com-access.log |grep -v 18297|awk -F  +0800 '{print $1}'|sort |uniq -c|tail -n 25
+# grep 114.84.158.180 sh-cms-api.00joy.com-access.log |grep -v 18297|awk -F  +0800 '{print $1}'|sort |uniq -c|tail -n 25
